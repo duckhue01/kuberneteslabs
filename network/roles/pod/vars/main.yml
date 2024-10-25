@@ -1,0 +1,6 @@
+# pod_containers: ["con1", "con2"]
+# pod_containers:
+#   con1: 10.0.0.2
+#   con2: 10.0.0.3
+
+# pod_br0: 10.0.0.1

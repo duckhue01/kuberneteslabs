@@ -1,0 +1,5 @@
+- name: Create single node pod network
+  hosts: dragon
+  become: true
+  roles:
+    - pod

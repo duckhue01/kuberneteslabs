@@ -1,0 +1,93 @@
+- name: Test
+  ansible.builtin.debug:
+    msg: "{{ pod_containers[item] }}"
+  changed_when: false
+  with_items: "{{ pod_containers }}"
+
+- name: Remove network namespaces
+  ansible.builtin.command:
+    ip netns delete {{ item }}
+  with_items: "{{ pod_containers }}"
+  failed_when: false
+  changed_when: false
+
+- name: Remove network links
+  ansible.builtin.command:
+    "ip link delete {{ item }}0"
+  with_items: "{{ pod_containers }}"
+  changed_when: false
+  failed_when: false
+
+- name: Remove bridge
+  ansible.builtin.command:
+    ip link delete br0
+  changed_when: false
+  failed_when: false
+
+- name: Remove virtual devices
+  ansible.builtin.command: ip link delete {{ item }}
+  with_items:
+    - veth10
+    - veth20
+    - veth21
+    - veth11
+  failed_when: false
+  changed_when: false
+
+
+- name: Create the namespaces
+  ansible.builtin.command: "ip netns add {{ item }}"
+  changed_when: false
+  with_items: "{{ pod_containers }}"
+
+- name: Create the veth pairs
+  ansible.builtin.command: "ip link add  {{ item }}0 type veth peer name {{ item }}1"
+  with_items: "{{ pod_containers }}"
+  changed_when: false
+
+- name: Adding the veth pairs to the namespaces
+  ansible.builtin.command: ip link set {{ item }}1 netns {{ item }}
+  with_items: "{{ pod_containers }}"
+  changed_when: false
+
+- name: Config the interfaces in the network namesapces with IP address
+  ansible.builtin.command: ip netns exec {{ item }} ip addr add {{ pod_containers[item] }}/16 dev {{ item }}1
+  with_items: "{{ pod_containers }}"
+  changed_when: false
+
+- name: Enabling the interfaces inside the network namespaces
+  ansible.builtin.command: ip netns exec {{ item }} ip link set dev {{ item }}1 up
+  with_items: "{{ pod_containers }}"
+  changed_when: false
+
+- name: Create the bridge
+  ansible.builtin.command: ip link add name br0 type bridge
+  changed_when: false
+
+- name: Add the network namespaces itnerfaces to the bridge
+  ansible.builtin.command: ip link set dev {{ item }}0 master br0
+  with_items: "{{ pod_containers }}"
+  changed_when: false
+
+- name: Assigning the IP address to the bridge
+  ansible.builtin.command: ip addr add {{ pod_br0 }}/16 dev br0
+  changed_when: false
+
+- name: Enable the bridge
+  ansible.builtin.command: ip link set dev br0 up
+  changed_when: false
+
+- name: Enable the interface connected to the bridge
+  ansible.builtin.command: ip link set dev {{ item }}0 up
+  with_items: "{{ pod_containers }}"
+  changed_when: false
+
+- name: Set the loopback interfaces in the netwok namespaces
+  ansible.builtin.command: ip netns exec {{ item }} ip link set lo up
+  with_items: "{{ pod_containers }}"
+  changed_when: false
+
+- name: Set the default route in the network namesapces
+  ansible.builtin.command: ip netns exec {{ item }} ip route add default via {{ pod_br0 }} dev {{ item }}1
+  with_items: "{{ pod_containers }}"
+  changed_when: false
