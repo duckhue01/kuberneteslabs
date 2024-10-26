@@ -2,3 +2,4 @@ myYouTube_video_container_networking
 venv
 container-networking
 .vscode
+hosts.yaml
