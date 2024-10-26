@@ -1,0 +1,19 @@
+- name: Create single node pod network
+  hosts: dragon
+  become: true
+  tasks:
+    - name: Get hosts
+      ansible.builtin.debug:
+        msg: "{{ groups['dragon'][0] }}"
+      changed_when: false
+  tags: teardown
+
+- name: Create single node pod network
+  hosts: dragon
+  become: true
+  tasks:
+    - name: Get hosts
+      ansible.builtin.debug:
+        msg: "teardown1"
+      changed_when: false
+  tags: teardown1

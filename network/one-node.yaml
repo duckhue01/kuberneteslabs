@@ -1,5 +1,6 @@
 - name: Create single node pod network
-  hosts: dragon
+  hosts:
+    - dragon
   become: true
   roles:
     - pod
@@ -8,3 +9,40 @@
       con1: 10.0.0.2
       con2: 10.0.0.3
     pod_br0: 10.0.0.10
+
+- name: Teardown
+  tags: [never, teardown]
+  hosts:
+    - dragon
+  become: true
+  vars:
+    pod_containers:
+      con1: 10.0.0.2
+      con2: 10.0.0.3
+    pod_br0: 10.0.0.10
+  tasks:
+    - name: Remove network namespaces
+      ansible.builtin.command:
+        ip netns delete {{ item }}
+      with_items: "{{ pod_containers }}"
+      failed_when: false
+      changed_when: false
+
+    - name: Remove network links
+      ansible.builtin.command:
+        "ip link delete {{ item }}0"
+      with_items: "{{ pod_containers }}"
+      changed_when: false
+      failed_when: false
+
+    - name: Remove bridge
+      ansible.builtin.command:
+        ip link delete br0
+      changed_when: false
+      failed_when: false
+
+    - name: Remove virtual devices
+      ansible.builtin.command: ip link delete {{ item }}
+      with_items: "{{ pod_containers }}0"
+      failed_when: false
+      changed_when: false

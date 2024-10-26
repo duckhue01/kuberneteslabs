@@ -11,7 +11,7 @@
       failed_when: false
     - name: Set the route on the node to reach the network namesapces on the other node
       ansible.builtin.command:
-        ip route add 10.1.0.0/16 via 192.168.100.27 dev enp0s31f6
+        "ip route add 10.1.0.0/16 via 192.168.100.27 dev {{ pod_eth_name }}"
       changed_when: false
     - name: Enables Ip forwarding on the node
       ansible.builtin.command:
@@ -22,6 +22,7 @@
       con1: 10.0.0.1
       con2: 10.0.0.2
     pod_br0: 10.0.0.10
+    pod_eth_name: enp0s31f6
 
 - name: Create network infra on snake
   hosts: snake
@@ -34,9 +35,9 @@
         ip route del 10.0.0.0/16
       changed_when: false
       failed_when: false
-    - name: Set the route on the node to rach the network namsapces on the other node
+    - name: Set the route on the node to reach the network namsapces on the other node
       ansible.builtin.command:
-        ip route add 10.0.0.0/16 via 192.168.100.108 dev wlp1s0
+        "ip route add 10.0.0.0/16 via 192.168.100.108 dev {{ pod_eth_name }} "
       changed_when: false
     - name: Enables Ip forwarding on the node
       ansible.builtin.command:
@@ -47,13 +48,90 @@
       con1: 10.1.0.3
       con2: 10.1.0.4
     pod_br0: 10.1.0.10
+    pod_eth_name: wlp1s0
 
-- name: Teardown
-  tags: teardown
+- name: Teardown dragon
+  tags: [never, teardown]
+  hosts:
+    - dragon
+  become: true
+  vars:
+    pod_containers:
+      con1: 10.0.0.2
+      con2: 10.0.0.3
+    pod_br0: 10.0.0.10
+  tasks:
+    - name: Remove network namespaces
+      ansible.builtin.command:
+        ip netns delete {{ item }}
+      with_items: "{{ pod_containers }}"
+      failed_when: false
+      changed_when: false
+
+    - name: Remove network links
+      ansible.builtin.command:
+        "ip link delete {{ item }}0"
+      with_items: "{{ pod_containers }}"
+      changed_when: false
+      failed_when: false
+
+    - name: Remove bridge
+      ansible.builtin.command:
+        ip link delete br0
+      changed_when: false
+      failed_when: false
+
+    - name: Remove virtual devices
+      ansible.builtin.command: ip link delete {{ item }}
+      with_items: "{{ pod_containers }}0"
+      failed_when: false
+      changed_when: false
+
+    - name: Remove route rule
+      ansible.builtin.command:
+        ip route del 10.1.0.0/16
+      changed_when: false
+      failed_when: false
+
+- name: Teardown snake
+  tags: [never, teardown]
   hosts:
     - snake
-    - dragon
+  become: true
+  vars:
+    pod_containers:
+      con1: 10.1.0.3
+      con2: 10.1.0.4
+    pod_br0: 10.1.0.10
   tasks:
-    - name: Teardown
-      ansible.builtin.command: echo "Teardown"
+    - name: Remove network namespaces
+      ansible.builtin.command:
+        ip netns delete {{ item }}
+      with_items: "{{ pod_containers }}"
+      failed_when: false
       changed_when: false
+
+    - name: Remove network links
+      ansible.builtin.command:
+        "ip link delete {{ item }}0"
+      with_items: "{{ pod_containers }}"
+      changed_when: false
+      failed_when: false
+
+    - name: Remove bridge
+      ansible.builtin.command:
+        ip link delete br0
+      changed_when: false
+      failed_when: false
+
+    - name: Remove virtual devices
+      ansible.builtin.command: ip link delete {{ item }}
+      with_items: "{{ pod_containers }}0"
+      failed_when: false
+      changed_when: false
+
+    - name: Remove route rule
+      ansible.builtin.command:
+        ip route del 10.0.0.0/16
+      changed_when: false
+      failed_when: false
